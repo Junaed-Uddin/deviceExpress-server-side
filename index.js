@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const port = process.env.PORT || 5000;
@@ -12,11 +12,13 @@ app.use(express.json());
 
 // database setup 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.t0pnxex.mongodb.net/?retryWrites=true&w=majority`;
-console.log(uri);
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 // Collections
 const Users = client.db("deviceExpress").collection("Users");
+const Categories = client.db("deviceExpress").collection("Categories");
+const Products = client.db("deviceExpress").collection("Products");
+const Booking = client.db("deviceExpress").collection("Booking");
 
 // database connected 
 async function dbConnect() {
@@ -30,7 +32,7 @@ async function dbConnect() {
 
 dbConnect();
 
-app.post('/users', async(req, res) => {
+app.post('/users', async (req, res) => {
     try {
         const user = req.body;
         const result = await Users.insertOne(user);
@@ -54,6 +56,87 @@ app.post('/users', async(req, res) => {
     }
 });
 
+// category load 
+app.get('/categories', async (req, res) => {
+    try {
+        const query = {};
+        const categories = await Categories.find(query).toArray();
+        res.send({
+            success: true,
+            data: categories
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// get products 
+app.get('/category/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { category_id: id };
+        const products = await Products.find(query).toArray();
+        res.send({
+            success: true,
+            data: products
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// booking data
+app.post('/booking', async (req, res) => {
+    try {
+        const booking = req.body;
+        console.log(booking);
+        const result = await Booking.insertOne(booking);
+        if (result.insertedId) {
+            res.send({
+                success: true,
+                message: `${booking.productName} laptop booked successfully`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Something Went Wrong`
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+//my orders
+app.get('/myOrders', async (req, res) => {
+    try {
+        const query = {};
+        const orders = await Booking.find(query).toArray();
+        res.send({
+            success: true,
+            data: orders
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
 
 
 // route endpoint test
