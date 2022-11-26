@@ -104,6 +104,38 @@ app.get('/users/admin/:email', verifyJWT, async (req, res) => {
     }
 });
 
+// verify seller 
+const verifySeller = async (req, res, next) => {
+    console.log(req.decoded.email);
+    const decodedEmail = req.decoded.email;
+    const query = { email: decodedEmail };
+    const users = await Users.findOne(query);
+
+    if (users?.role !== 'Seller') {
+        return res.status(403).send({ message: 'Forbidden Access' });
+    }
+    next();
+}
+
+// check seller
+app.get('/users/seller/:email', verifyJWT, async (req, res) => {
+    try {
+        const { email } = req.params;
+        const query = { email };
+        const user = await Users.findOne(query);
+        res.send({
+            success: true,
+            isAdmin: user?.role === 'Seller'
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
 //users stored 
 app.post('/users', async (req, res) => {
     try {
@@ -160,7 +192,7 @@ app.get('/categories', async (req, res) => {
 });
 
 // get products 
-app.get('/category/:name', async (req, res) => {
+app.get('/category/:name', verifyJWT, async (req, res) => {
     try {
         const { name } = req.params;
         const query = { category_name: name };
@@ -178,8 +210,8 @@ app.get('/category/:name', async (req, res) => {
     }
 });
 
-//post products
-app.post('/category', verifyJWT, async (req, res) => {
+//add products
+app.post('/category', verifyJWT, verifySeller, async (req, res) => {
     try {
         const body = req.body;
         const product = await Products.insertOne(body);
@@ -204,9 +236,106 @@ app.post('/category', verifyJWT, async (req, res) => {
     }
 });
 
+// my products data
+app.get('/category', verifyJWT, verifySeller, async (req, res) => {
+    try {
+        const { email } = req.query;
+        const query = { email: email };
+        const products = await Products.find(query).toArray();
+        res.send({
+            success: true,
+            data: products
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+})
+
+//add property advertisement
+app.put('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const filter = { _id: ObjectId(id) };
+        const options = { upsert: true };
+        const updateDoc = {
+            $set: {
+                display: 'advertise'
+            }
+        }
+        const result = await Products.updateOne(filter, updateDoc, options);
+        if (result.matchedCount) {
+            res.send({
+                success: true,
+                message: `Advertise Product to display`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: 'Something went wrong'
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// get advertise product 
+app.get('/product/advertise', async (req, res) => {
+    try {
+        const query = { display: 'advertise' };
+        const advertisementProducts = await Products.find(query).toArray();
+        res.send({
+            success: true,
+            data: advertisementProducts
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// delete product (sold) data
+app.delete('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { _id: ObjectId(id) };
+        const result = await Products.deleteOne(query);
+        if (result.deletedCount) {
+            res.send({
+                success: true,
+                message: `Product Deleted Successfully`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Wont't deleted. try again`
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+})
+
 
 // booking data
-app.post('/booking', async (req, res) => {
+app.post('/booking', verifyJWT, async (req, res) => {
     try {
         const booking = req.body;
         const result = await Booking.insertOne(booking);
@@ -232,7 +361,7 @@ app.post('/booking', async (req, res) => {
 });
 
 
-//users order
+//my orders
 app.get('/booking', verifyJWT, async (req, res) => {
     try {
         const email = req.query.email;
