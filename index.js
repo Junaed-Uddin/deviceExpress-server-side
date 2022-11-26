@@ -19,6 +19,7 @@ const Users = client.db("deviceExpress").collection("Users");
 const Categories = client.db("deviceExpress").collection("Categories");
 const Products = client.db("deviceExpress").collection("Products");
 const Booking = client.db("deviceExpress").collection("Booking");
+const ReportedItems = client.db("deviceExpress").collection("ReportedItems");
 
 // database connected 
 async function dbConnect() {
@@ -208,6 +209,77 @@ app.get('/category/:name', verifyJWT, async (req, res) => {
     }
 });
 
+// post reported items
+app.post('/reportItems', verifyJWT, async (req, res) => {
+    try {
+        const reportProduct = req.body;
+
+        const result = await ReportedItems.insertOne(reportProduct);
+        if (result.insertedId) {
+            res.send({
+                success: true,
+                message: `${reportProduct.productName} reported to Admin`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Not successfully reported to admin`
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// get reported items
+app.get('/reportItems', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const query = {};
+        const reportData = await ReportedItems.find(query).toArray();
+        res.send({
+            success: true,
+            data: reportData
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// reported item delete
+app.delete('/reportedItem/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { _id: ObjectId(id) };
+        const result = await ReportedItems.deleteOne(query);
+        if (result.deletedCount) {
+            res.send({
+                success: true,
+                message: `Deleted successfully`
+            })
+        }
+        else {
+            res.send({
+                success: true,
+                message: `Couldn't deleted successfully`
+            })
+        }
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+})
+
 //add products
 app.post('/category', verifyJWT, verifySeller, async (req, res) => {
     try {
@@ -255,7 +327,7 @@ app.get('/category', verifyJWT, verifySeller, async (req, res) => {
 })
 
 //add property advertisement
-app.put('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
+app.put('/productAdvertise/:id', verifyJWT, verifySeller, async (req, res) => {
     try {
         const { id } = req.params;
         const filter = { _id: ObjectId(id) };
@@ -290,7 +362,7 @@ app.put('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
 // get advertise product 
 app.get('/product/advertise', async (req, res) => {
     try {
-        const query = { display: 'advertise' };
+        const query = { display: 'advertise', status: 'available' };
         const advertisementProducts = await Products.find(query).toArray();
         res.send({
             success: true,
@@ -306,7 +378,7 @@ app.get('/product/advertise', async (req, res) => {
 });
 
 // delete product (sold) data
-app.delete('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
+app.delete('/soldProduct/:id', verifyJWT, verifySeller, async (req, res) => {
     try {
         const { id } = req.params;
         const query = { _id: ObjectId(id) };
@@ -351,7 +423,7 @@ app.get('/users/buyer', verifyJWT, verifyAdmin, async (req, res) => {
 });
 
 // buyer delete 
-app.delete('/users/buyer/:id', verifyJWT, verifyAdmin, async (req, res) => {
+app.delete('/buyerDelete/:id', verifyJWT, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const query = { _id: ObjectId(id) };
@@ -396,16 +468,50 @@ app.get('/users/seller', verifyJWT, verifyAdmin, async (req, res) => {
 });
 
 // seller delete 
-app.delete('/users/seller/:id', verifyJWT, verifyAdmin, async (req, res) => {
+app.delete('/deleteSellers/:id', verifyJWT, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        console.log(id)
         const query = { _id: ObjectId(id) };
         const result = await Users.deleteOne(query);
         if (result.deletedCount) {
             res.send({
                 success: true,
                 message: `Seller Successfully Deleted`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Something went wrong`
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+//verified 
+app.put('/userVerified/:email', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const { email } = req.params;
+        const filter = { email: email };
+        const options = { upsert: true };
+        const updateDoc = {
+            $set: {
+                verified: 'yes'
+            }
+        }
+
+        const result1 = await Users.updateOne(filter, updateDoc, options);
+        const result2 = await Products.updateMany(filter, updateDoc, options);
+        if (result1.matchedCount && result2.matchedCount) {
+            res.send({
+                success: true,
+                message: `Seller verified`
             })
         }
         else {
