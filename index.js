@@ -74,7 +74,6 @@ const verifyJWT = (req, res, next) => {
 
 // verify admin 
 const verifyAdmin = async (req, res, next) => {
-    console.log(req.decoded.email);
     const decodedEmail = req.decoded.email;
     const query = { email: decodedEmail };
     const users = await Users.findOne(query);
@@ -106,7 +105,6 @@ app.get('/users/admin/:email', verifyJWT, async (req, res) => {
 
 // verify seller 
 const verifySeller = async (req, res, next) => {
-    console.log(req.decoded.email);
     const decodedEmail = req.decoded.email;
     const query = { email: decodedEmail };
     const users = await Users.findOne(query);
@@ -125,7 +123,7 @@ app.get('/users/seller/:email', verifyJWT, async (req, res) => {
         const user = await Users.findOne(query);
         res.send({
             success: true,
-            isAdmin: user?.role === 'Seller'
+            isSeller: user?.role === 'Seller'
         })
 
     } catch (error) {
@@ -239,6 +237,7 @@ app.post('/category', verifyJWT, verifySeller, async (req, res) => {
 // my products data
 app.get('/category', verifyJWT, verifySeller, async (req, res) => {
     try {
+
         const { email } = req.query;
         const query = { email: email };
         const products = await Products.find(query).toArray();
@@ -331,7 +330,70 @@ app.delete('/users/seller/:id', verifyJWT, verifySeller, async (req, res) => {
             message: error.message
         })
     }
+});
+
+//get all buyers
+app.get('/users/buyer', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const query = { role: 'Buyer' };
+        const buyers = await Users.find(query).toArray();
+        res.send({
+            success: true,
+            data: buyers
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// buyer delete 
+app.delete('/users/buyer/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { _id: ObjectId(id) };
+        const result = await Users.deleteOne(query);
+        if (result.deletedCount) {
+            res.send({
+                success: true,
+                message: `User Successfully Deleted`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Something went wrong`
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
 })
+
+//get all sellers
+app.get('/users/seller', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const query = { role: 'Seller' };
+        const sellers = await Users.find(query).toArray();
+        res.send({
+            success: true,
+            data: sellers
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
 
 
 // booking data
