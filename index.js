@@ -72,18 +72,6 @@ const verifyJWT = (req, res, next) => {
     })
 };
 
-// verify admin 
-const verifyAdmin = async (req, res, next) => {
-    const decodedEmail = req.decoded.email;
-    const query = { email: decodedEmail };
-    const users = await Users.findOne(query);
-
-    if (users?.role !== 'admin') {
-        return res.status(403).send({ message: 'Forbidden Access' });
-    }
-    next();
-}
-
 // check Admin
 app.get('/users/admin/:email', verifyJWT, async (req, res) => {
     try {
@@ -103,13 +91,13 @@ app.get('/users/admin/:email', verifyJWT, async (req, res) => {
     }
 });
 
-// verify seller 
-const verifySeller = async (req, res, next) => {
+// verify admin 
+const verifyAdmin = async (req, res, next) => {
     const decodedEmail = req.decoded.email;
     const query = { email: decodedEmail };
     const users = await Users.findOne(query);
 
-    if (users?.role !== 'Seller') {
+    if (users?.role !== 'admin') {
         return res.status(403).send({ message: 'Forbidden Access' });
     }
     next();
@@ -133,6 +121,18 @@ app.get('/users/seller/:email', verifyJWT, async (req, res) => {
         })
     }
 });
+
+// verify seller 
+const verifySeller = async (req, res, next) => {
+    const decodedEmail = req.decoded.email;
+    const query = { email: decodedEmail };
+    const users = await Users.findOne(query);
+
+    if (users?.role !== 'Seller') {
+        return res.status(403).send({ message: 'Forbidden Access' });
+    }
+    next();
+}
 
 //users stored 
 app.post('/users', async (req, res) => {
@@ -351,7 +351,7 @@ app.get('/users/buyer', verifyJWT, verifyAdmin, async (req, res) => {
 });
 
 // buyer delete 
-app.delete('/users/buyer/:id', async (req, res) => {
+app.delete('/users/buyer/:id', verifyJWT, verifyAdmin, async (req, res) => {
     try {
         const { id } = req.params;
         const query = { _id: ObjectId(id) };
@@ -386,6 +386,34 @@ app.get('/users/seller', verifyJWT, verifyAdmin, async (req, res) => {
             success: true,
             data: sellers
         })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// seller delete 
+app.delete('/users/seller/:id', verifyJWT, verifyAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(id)
+        const query = { _id: ObjectId(id) };
+        const result = await Users.deleteOne(query);
+        if (result.deletedCount) {
+            res.send({
+                success: true,
+                message: `Seller Successfully Deleted`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Something went wrong`
+            })
+        }
 
     } catch (error) {
         res.send({
