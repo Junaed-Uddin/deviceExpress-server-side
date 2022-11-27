@@ -4,6 +4,7 @@ const app = express();
 const { MongoClient, ServerApiVersion, ObjectId, Admin } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware 
@@ -18,6 +19,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 const Users = client.db("deviceExpress").collection("Users");
 const Categories = client.db("deviceExpress").collection("Categories");
 const Products = client.db("deviceExpress").collection("Products");
+const Payments = client.db("deviceExpress").collection("Payments");
 const Booking = client.db("deviceExpress").collection("Booking");
 const ReportedItems = client.db("deviceExpress").collection("ReportedItems");
 
@@ -194,7 +196,7 @@ app.get('/categories', async (req, res) => {
 app.get('/category/:name', verifyJWT, async (req, res) => {
     try {
         const { name } = req.params;
-        const query = { category_name: name };
+        const query = { category_name: name, status: 'available' };
         const products = await Products.find(query).toArray();
         res.send({
             success: true,
@@ -214,18 +216,33 @@ app.post('/reportItems', verifyJWT, async (req, res) => {
     try {
         const reportProduct = req.body;
 
-        const result = await ReportedItems.insertOne(reportProduct);
-        if (result.insertedId) {
-            res.send({
-                success: true,
-                message: `${reportProduct.productName} reported to Admin`
-            })
-        }
-        else {
-            res.send({
-                success: false,
-                message: `Not successfully reported to admin`
-            })
+        const productId = reportProduct.productId;
+        const filter = { _id: ObjectId(productId) };
+        const products = await Products.findOne(filter);
+
+        if (products) {
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    reported: 'yes'
+                }
+            }
+
+            const report = await Products.updateOne(filter, updateDoc, options);
+            const result = await ReportedItems.insertOne(reportProduct);
+
+            if (result.insertedId && report.matchedCount) {
+                res.send({
+                    success: true,
+                    message: `${reportProduct.productName} reported to Admin`
+                })
+            }
+            else {
+                res.send({
+                    success: false,
+                    message: `Not successfully reported to admin`
+                })
+            }
         }
 
     } catch (error) {
@@ -260,6 +277,7 @@ app.delete('/reportedItem/:id', async (req, res) => {
         const { id } = req.params;
         const query = { _id: ObjectId(id) };
         const result = await ReportedItems.deleteOne(query);
+
         if (result.deletedCount) {
             res.send({
                 success: true,
@@ -572,6 +590,92 @@ app.get('/booking', verifyJWT, async (req, res) => {
             success: true,
             data: orders
         })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// get specific booking data
+app.get('/booking/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const query = { _id: ObjectId(id) };
+        const booking = await Booking.findOne(query);
+        res.send({
+            success: true,
+            data: booking
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+});
+
+// payment intent
+app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+    const bookingPayment = req.body;
+    const price = bookingPayment.resalePrice;
+    const amount = price * 100;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+        currency: "bdt",
+        amount: amount,
+        "payment_method_types": [
+            "card"
+        ],
+    });
+
+    res.send({
+        clientSecret: paymentIntent.client_secret,
+    });
+});
+
+// payment info stored
+app.post('/payments', async (req, res) => {
+    try {
+        const payment = req.body;
+        const result = await Payments.insertOne(payment);
+
+        const bookingId = payment.bookingId;
+        const filter = { _id: ObjectId(bookingId) };
+        const options = { upsert: true };
+        const updateDoc = {
+            $set: {
+                paid: true,
+                transactionId: payment.transactionId
+            }
+        }
+
+        const productId = payment.productId;
+        const query = { _id: ObjectId(productId) };
+        const updateStatus = {
+            $set: {
+                status: 'unavailable'
+            }
+        }
+
+        const booking = await Booking.updateOne(filter, updateDoc, options);
+        const productInfoUpdate = await Products.updateOne(query, updateStatus, options);
+
+        if (result.insertedId && booking.matchedCount && productInfoUpdate.matchedCount) {
+            res.send({
+                success: true,
+                message: `Successfully completed the payment`
+            })
+        }
+        else {
+            res.send({
+                success: false,
+                message: `Payment couldn't successfully completed. please try again`
+            })
+        }
 
     } catch (error) {
         res.send({
