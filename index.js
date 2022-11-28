@@ -22,6 +22,7 @@ const Products = client.db("deviceExpress").collection("Products");
 const Payments = client.db("deviceExpress").collection("Payments");
 const Booking = client.db("deviceExpress").collection("Booking");
 const ReportedItems = client.db("deviceExpress").collection("ReportedItems");
+const CustomerReview = client.db("deviceExpress").collection("CustomerReview");
 
 // database connected 
 async function dbConnect() {
@@ -43,7 +44,7 @@ app.get('/jwt', async (req, res) => {
         const user = await Users.findOne(query);
 
         if (user) {
-            const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '2h' });
+            const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '7d' });
             return res.send({
                 accessToken: token
             })
@@ -684,6 +685,24 @@ app.post('/payments', async (req, res) => {
         })
     }
 });
+
+// user reviews
+app.get('/userReviews', async (req, res) => {
+    try {
+        const query = {};
+        const reviews = await CustomerReview.find(query).toArray();
+        res.send({
+            success: true,
+            data: reviews
+        })
+
+    } catch (error) {
+        res.send({
+            success: false,
+            message: error.message
+        })
+    }
+})
 
 
 // route endpoint test
